@@ -1,3 +1,5 @@
+const fs = require("fs");
+function run(fileloc){
 class FishyLang{
     constructor(codes){
         this.codes = codes
@@ -7,7 +9,7 @@ class FishyLang{
         const length = this.codes.length
         let pos = 0
         let tokens = []
-        const BUILTINKEYWORDS = ["print", "var"]
+        const BUILT_IN_KEYWORDS = ["print", "var"]
 
         const varChars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_'
 
@@ -35,15 +37,15 @@ class FishyLang{
                     column++
                 }
                 if(this.codes[pos] !== '"'){
-                    return{
-                        error: `Unterminated error at line ${line} column ${column}, fix it for me please`
+                    return {
+                        error: `Unterminated string at line ${line} column ${column}`
                     }
                 }
                 pos++
                 column++
                 tokens.push({
                     type: "string",
-                    value: res
+                    value: res,
                 })
             }else if(varChars.includes(currentChar)){
                 let res = currentChar
@@ -55,7 +57,7 @@ class FishyLang{
                     column++
                 }
                 tokens.push({
-                    type: BUILTINKEYWORDS.includes(res) ? "keyword" : "keyword_custom",
+                    type: BUILT_IN_KEYWORDS.includes(res) ? "keyword" : "keyword_custom",
                     value: res
                 })
             }else if(currentChar === "="){
@@ -66,12 +68,12 @@ class FishyLang{
                     value: "eq"
                 })
             }else{
-                return{
+                return {
                     error: `Unexpected character ${this.codes[pos]} at line ${line} column ${column}`
                 }
             }
         }
-        return{
+        return {
             error: false,
             tokens
         }
@@ -80,21 +82,62 @@ class FishyLang{
     parse(tokens){
         const len = tokens.length
         let pos = 0
-        
+        const vars = {}
+
         while(pos < len){
             const token = tokens[pos]
             if(token.type === "keyword" && token.value === "print"){
-                let isString = tokens[pos + 1] && tokens[pos + 1].type === "string"
-                if(!isString){
+                if(!tokens[pos + 1]){
+                    return console.log("Unexpected end of line, expected string")
+                }
+                let isVar = tokens[pos + 1].type === "keyword_custom"
+                let isString = tokens[pos + 1].type === "string"
+                if(!isString && !isVar){
+                    return console.log(`Unexpected token ${tokens[pos + 1].type}, expected string`)
+                }
+                if(isVar){
+                    if(!(tokens[pos + 1].value in vars)){
+                        return console.log(`Undefined variable ${tokens[pos + 1].value}`)
+                    }
+                    console.log(vars[tokens[pos + 1].value])
+                }else{
+                    console.log(tokens[pos + 1].value)
+                }
+                pos += 2
+            }else if(token.type === "keyword" && token.value === "var"){
+                const isCustomKW = tokens[pos + 1] && tokens[pos + 1].type === "keyword_custom"
+                if(!isCustomKW){
                     if(!tokens[pos + 1]){
-                        return console.log(`Unexpected end of line, expected string`)
+                        return console.log("Unexpected end of line, expected variable name")
+                    }
+                    return console.log(`Unexpected token ${tokens[pos + 1].type}, expected variable name`)
+                }
+                const varName = tokens[pos + 1].value
+
+                const isEq = tokens[pos + 2] && tokens[pos + 2].type === "operator" && tokens[pos + 2].value === "eq"
+                if(!isEq){
+                    if(!tokens[pos + 2]){
+                        return console.log("Unexpected end of line, expected =")
+                    }
+                    return console.log(`Unexpected token ${tokens[pos + 1].type}, expected =`)
+                }
+
+                const isString = tokens[pos + 3] && tokens[pos + 3].type === "string"
+                if(!isString){
+                    if(!tokens[pos + 3]){
+                        return console.log("Unexpected end of line, expected string")
                     }
                     return console.log(`Unexpected token ${tokens[pos + 1].type}, expected string`)
                 }
-                console.log(tokens[pos + 1].value)
-                pos += 2
+
+                if(varName in vars){
+                    return console.log(`Variable ${varName} already exists`)
+                }
+                vars[varName] = tokens[pos + 3].value
+                pos += 4
+            }else{
+                return console.log(`Unexpected token ${token.type}`)
             }
-            pos++
         }
     }
 
@@ -107,9 +150,7 @@ class FishyLang{
     }
 }
 
-const codes = `
-print "ok"
-var msg = "test"
-`
+const codes = fs.readFileSync(fileloc)
 const fishylang = new FishyLang(codes)
 fishylang.run()
+}
